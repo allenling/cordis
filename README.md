@@ -1,3 +1,3 @@
-# cordis
+# curds
 
 curio redis
