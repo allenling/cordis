@@ -29,19 +29,22 @@ recv加锁, 如果recv一次拿到了多个命令返回, 那么当前的coroutin
        # 等待event
        await ev.wait()
 
-2. 然后当调度到recv的时候, 有可能recv多个命令的返回:
+2. spawn一个rev任务, 然后当调度到recv的时候, 有可能recv多个命令的返回:
 
    .. code-block:: python
 
-       # 以resps的长度为准, 因为担心有可能有一个coroutine发送了命令, 但是这一次的recv没有获取到, 此时ev_queue的长度就大于resps
-       while resps:
-           for resp in resps:
-               # 拿到event的对象和id
-               ev, ev_id = ev_queue.get
-               # 存储结果
-               res[ev_id] = resp
-               # 唤醒event
-               await ev.set()
+       while True:
+           data = await self.sock.recv(1024)
+           resps = data.split(b'\r\n')
+           # 以resps的长度为准, 因为担心有可能有一个coroutine发送了命令, 但是这一次的recv没有获取到, 此时ev_queue的长度就大于resps
+           while resps:
+               for resp in resps:
+                   # 拿到event的对象和id
+                   ev, ev_id = ev_queue.get
+                   # 存储结果
+                   res[ev_id] = resp
+                   # 唤醒event
+                   await ev.set()
 
 3. event受信, 那么说明结果返回了
 
