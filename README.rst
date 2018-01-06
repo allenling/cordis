@@ -20,28 +20,38 @@ recv加锁, 如果recv一次拿到了多个命令返回, 那么当前的coroutin
 可以spawn一个专门recv的corotine, 这样send不受限制, 然后可以一次拿到多个命令的返回:
 
 1. 每次send之前, 把自己的event加入带等待唤醒的queue中(加入list不太好?), 然后send, 然后等待event被唤醒
-   ev, ev_id = get_ev()
-   await ev_queue.put((ev_id, ev))
-   await send(cmd)
-   # 等待event
-   await ev.wait()
+
+   .. code-block:: python
+
+       ev, ev_id = get_ev()
+       await ev_queue.put((ev_id, ev))
+       await send(cmd)
+       # 等待event
+       await ev.wait()
 
 2. 然后当调度到recv的时候, 有可能recv多个命令的返回:
-   # 以resps的长度为准, 因为担心有可能有一个coroutine发送了命令, 但是这一次的recv没有获取到, 此时ev_queue的长度就大于resps
-   while resps:
-       for resp in resps:
-           # 拿到event的对象和id
-           ev, ev_id = ev_queue.get
-           # 存储结果
-           res[ev_id] = resp
-           唤醒event
-           await ev.set()
+
+   .. code-block:: python
+
+       # 以resps的长度为准, 因为担心有可能有一个coroutine发送了命令, 但是这一次的recv没有获取到, 此时ev_queue的长度就大于resps
+       while resps:
+           for resp in resps:
+               # 拿到event的对象和id
+               ev, ev_id = ev_queue.get
+               # 存储结果
+               res[ev_id] = resp
+               # 唤醒event
+               await ev.set()
 
 3. event受信, 那么说明结果返回了
-   await ev.wait()
-   res = res[ev_id]
-   del res[ev_id]
+
+   .. code-block:: python
+
+       await ev.wait()
+       res = res[ev_id]
+       del res[ev_id]
 
 该任务最好设置为daemon, 因为我们没办法去主动join它(在__del__中join?), 然后curio结束的时候, 此时该任务
+
 是非daemon, 并且没有被cancel, 没有join的, 所以会报never joined的warning
 
