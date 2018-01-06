@@ -1,3 +1,0 @@
-# curds
-
-curio redis
