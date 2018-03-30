@@ -4,12 +4,14 @@ from curds.connection import AsyncConnection
 from curds.utils import pack_command
 
 
+class CurdsPipeline:
+    def __init__(self, curds):
+        self.curds = curds
+
+
 class Curds:
 
     def __init__(self):
-        '''
-        recommand that await connect done before send any command
-        '''
         return
 
     async def connect(self):
@@ -28,6 +30,9 @@ class Curds:
         command = pack_command('INCR', key, count)
         resp = await self.connection.send(command)
         return resp
+
+    async def pipeline(self):
+        return CurdsPipeline(self)
 
 
 def main():
