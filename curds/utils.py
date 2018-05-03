@@ -47,7 +47,7 @@ def pack_command(*args):
     return output
 
 
-def parse_yield_redis_resp(redis_resp):
+def parse_redis_resp(redis_resp):
     return
 
 
@@ -72,12 +72,15 @@ def main():
     for test
     '''
     cmds = [['GET', 'a'], ['GET', 'b'], ['LRANGE', 'mlist', 0, -1],
-            ['HMGET', 'mhash', 'name', 'height']]
+            ['HMGET', 'mhash', 'name', 'height'],
+            ['LLEN', 'mlist'],
+            ['GET', 'aa']
+            ]
     for cmd in cmds:
         cmd_data = pack_command(*cmd)
         print(cmd_data[0])
 #     res = b'$1\r\n1\r\n$1\r\n2\r\n*4\r\n$1\r\n8\r\n$1\r\n7\r\n$1\r\n6\r\n$1\r\n5\r\n'
-#     print(parse_yield_redis_resp(res))
+#     print(parse_redis_resp(res))
     return
 
 

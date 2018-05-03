@@ -58,10 +58,8 @@ class AsyncConnection:
 
     async def _wait_recv(self):
         while True:
-            resps = await self.sock.recv(SOCK_READ_SIZE)
+            resps = await self.sock.recv(2048)
             f = self._future_deque.popleft()
-            # do not need await
-            # other side, __future_await__ is fine
             f.set_result(resps)
             continue
             # TODO: unpack_response
@@ -76,12 +74,27 @@ class AsyncConnection:
 async def test_async_connection():
     ac = AsyncConnection()
     await ac.connect()
-    cmds = [['GET', 'a'], ['GET', 'b'], ['LRANGE', 'mlist', 0, -1],
-            ['HMGET', 'mhash', 'name', 'height']]
+    cmds = [['GET', 'none'],
+            ['INCR', 'intkey'],
+            ['GET', 'a'], ['GET', 'b'], ['LRANGE', 'mlist', 0, -1],
+            ['HMGET', 'mhash', 'name', 'height'],
+            ['HGETALL', 'mobj'],
+            ['MULTI'],
+            ['LLEN', 'mlist'],
+            ['GET', 'a'],
+            ['EXEC'],
+            ['ZRANGE', 'mss', 0, -1, 'withscores'],
+            ['GEORADIUS', 'Sicily', 15, 37, 200, 'km', 'WITHCOORD']
+            ]
     for cmd in cmds:
         cmd_data = utils.pack_command(*cmd)
+        print(cmd_data)
         res = await ac.send(cmd_data[0])
         print(res)
+        print('---------------')
+    pipeline_cmd = b'*1\r\n$5\r\nMULTI\r\n*2\r\n$3\r\nGET\r\n$1\r\na\r\n*2\r\n$4\r\nLLEN\r\n$5\r\nmlist\r\n*1\r\n$4\r\nEXEC\r\n'
+    res = await ac.send(pipeline_cmd)
+    print(res)
     return
 
 
