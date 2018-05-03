@@ -4,6 +4,8 @@ redis protocol(RESP)
 simple pack and parse
 
 '''
+import copy
+
 from collections import deque
 
 from typing import List, Any
@@ -24,7 +26,7 @@ class RESPParser:
 
     def __init__(self):
         self.array_stack = []
-        self.last_str = None
+        self.last_str = deque([])
         return
 
     def parse(self, bdata: bytes) -> List[Any]:
@@ -40,13 +42,14 @@ class RESPParser:
         '''
         res = []
         data_str = bdata.decode('utf-8')
-        if self.last_str is not None:
-            data_str = self.last_str + data_str if self.last_str is not None else data_str
-            self.last_str = None
+        if self.last_str:
+            deq_str = ''.join(self.last_str)
+            data_str = deq_str + data_str
+            self.last_str = deque([])
         data_deq = deque(data_str.split('\r\n'))
-        last_str = data_deq.pop()
-        if last_str != '':
-            self.last_str = last_str
+        truncated_str = data_deq.pop()
+        if truncated_str != '':
+            self.last_str.append(truncated_str)
         # main loop, pop string only
         while True:
             try:
@@ -54,24 +57,27 @@ class RESPParser:
                 if resp.startswith('+') or resp.startswith('-'):
                     data = resp[1:]
                 elif resp.startswith(':'):
-                    self.last_str = resp
+                    self.last_str.appendleft(resp)
                     if len(resp) == 1:
                         break
                     data = int(resp[1:])
-                    self.last_str = None
+                    self.last_str.popleft()
                 elif resp.startswith('$'):
-                    self.last_str = resp
                     if resp[1:] == '-1':
                         data = None
                     else:
                         count = int(resp[1:])
-                        data = data_deq.popleft()
-                        # TODO: handle exception
-                        assert len(data) == count
-                    self.last_str = None
+                        try:
+                            data = data_deq.popleft()
+                            assert len(data) == count
+                        except IndexError:
+                            # last string
+                            self.last_str.extendleft(['\r\n', resp])
+                            break
                 elif resp.startswith('*'):
                     self.array_stack.append([int(resp[1]), []])
                     continue
+                # handle nested array
                 if self.array_stack:
                     self.array_stack[-1][0] -= 1
                     self.array_stack[-1][1].append(data)

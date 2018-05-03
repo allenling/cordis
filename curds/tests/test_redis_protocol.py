@@ -1,4 +1,5 @@
 from curds import redis_protocol
+from curds.tests.common_data import nested_array_resp, nested_array_result
 
 
 class TestParseCommonType:
@@ -36,15 +37,80 @@ class TestParseCommonType:
         '''
         data = GEORADIUS Sicily 15 37 200 km WITHCOORD
         '''
-        data = b'*2\r\n*2\r\n$7\r\nPalermo\r\n*2\r\n$20\r\n13.36138933897018433\r\n$20\r\n38.11555639549629859\r\n*2\r\n$7\r\nCatania\r\n*2\r\n$20\r\n15.08726745843887329\r\n$20\r\n37.50266842333162032\r\n'
-        list_data = [['Palermo', ['13.36138933897018433', '38.11555639549629859']], ['Catania', ['15.08726745843887329', '37.50266842333162032']]]
+        data = nested_array_resp
         resp = self.parser.parse(data)
+        self.check_nested_arrray(resp)
+        return
+
+    def check_nested_arrray(self, resp):
+        print(type(resp), len(resp), len(resp[0]), resp)
+        print('-----------')
         assert type(resp) is list and len(resp) == 1 and len(resp[0]) == 2
         resp = resp[0]
-        for i, j in zip(list_data, resp):
+        for i, j in zip(nested_array_result, resp):
             assert i[0] == j[0]
             for subi, subj in zip(i[1], j[1]):
                 assert subi == subj
+        return
+
+    def test_truncated_byte1(self):
+        '''
+        ...\r\n$20\r\n13.36138933897018433\r\n...
+        ...\r\n$20\r\n13.361389338
+        '''
+        data = nested_array_resp
+        resp = self.parser.parse(data[:42])
+        assert type(resp) is list and len(resp) == 0
+        resp = self.parser.parse(data[42:])
+        self.check_nested_arrray(resp)
+        return
+
+    def test_truncated_byte2(self):
+        '''
+        ...\r\n$20\r\n13.36138933897018433\r\n...
+        ...\r\n$2
+        '''
+        data = nested_array_resp
+        resp = self.parser.parse(data[:27])
+        assert type(resp) is list and len(resp) == 0
+        resp = self.parser.parse(data[27:])
+        self.check_nested_arrray(resp)
+        return
+
+    def test_truncated_byte3(self):
+        '''
+        ...\r\n$20\r\n13.36138933897018433\r\n...
+        ...\r\n$20\r
+        '''
+        data = nested_array_resp
+        resp = self.parser.parse(data[:29])
+        assert type(resp) is list and len(resp) == 0
+        resp = self.parser.parse(data[29:])
+        self.check_nested_arrray(resp)
+        return
+
+    def test_truncated_byte4(self):
+        '''
+        ...\r\n$20\r\n13.36138933897018433\r\n...
+        ...\r\n$20\r\n
+        '''
+        data = nested_array_resp
+        resp = self.parser.parse(data[:30])
+        assert type(resp) is list and len(resp) == 0
+        resp = self.parser.parse(data[30:])
+        self.check_nested_arrray(resp)
+        return
+
+    def test_truncated_byte5(self):
+        '''
+        ...\r\n$20\r\n13.36138933897018433\r\n...
+        ...\r\n$
+        '''
+        data = nested_array_resp
+        resp = self.parser.parse(data[:26])
+        assert type(resp) is list and len(resp) == 0
+        resp = self.parser.parse(data[26:])
+        self.check_nested_arrray(resp)
         return
 
 
