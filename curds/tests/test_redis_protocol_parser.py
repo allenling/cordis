@@ -43,8 +43,6 @@ class TestParseCommonType:
         return
 
     def check_nested_arrray(self, resp):
-        print(type(resp), len(resp), len(resp[0]), resp)
-        print('-----------')
         assert type(resp) is list and len(resp) == 1 and len(resp[0]) == 2
         resp = resp[0]
         for i, j in zip(nested_array_result, resp):
@@ -113,6 +111,15 @@ class TestParseCommonType:
         self.check_nested_arrray(resp)
         return
 
+    def test_pipeline_resp(self):
+        data = b'+OK\r\n+QUEUED\r\n+QUEUED\r\n*2\r\n$1\r\n1\r\n:2\r\n'
+        result = ['OK', 'QUEUED', 'QUEUED', ['1', 2]]
+        resp = self.parser.parse(data)
+        assert type(resp) is list and len(resp) == 4
+        for i, j in zip(result, resp):
+            assert i == j
+        return
+
 
 class TestKey:
     pass
@@ -120,7 +127,7 @@ class TestKey:
 
 def main():
     ts = TestParseCommonType()
-    ts.test_string()
+    ts.test_pipeline_resp()
     return
 
 

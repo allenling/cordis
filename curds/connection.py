@@ -74,7 +74,18 @@ class AsyncConnection:
 async def test_async_connection():
     ac = AsyncConnection()
     await ac.connect()
-    cmds = [['GET', 'none'],
+    pipeline_cmd = [['MULTI'], ['SET', 'a', 1], ['INCR', 'a'], ['GET', 'a'], ['EXEC']]
+    pipeline_list = []
+    for i in pipeline_cmd:
+        res = utils.pack_command(*i)
+        pipeline_list.append(res[0])
+    print(pipeline_list)
+    pipeline_cmd_byte = b''.join(pipeline_list)
+    print(pipeline_cmd_byte)
+    res = await ac.send(pipeline_cmd_byte)
+    print(res)
+    print('-----------------')
+    cmds = [['SET', 'a', 1],
             ['INCR', 'intkey'],
             ['GET', 'a'], ['GET', 'b'], ['LRANGE', 'mlist', 0, -1],
             ['HMGET', 'mhash', 'name', 'height'],

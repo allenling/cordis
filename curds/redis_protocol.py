@@ -4,7 +4,6 @@ redis protocol(RESP)
 simple pack and parse
 
 '''
-import copy
 
 from collections import deque
 
@@ -15,13 +14,29 @@ CRLF = '\r\n'
 BYTE_CRLF = b'\r\n'
 
 
-def pack_comand():
-    return
+def pack_redis(cmds: List[List[str]]):
+    '''
+    cmds = [[cmd1, arg1, ...], ...]
+    '''
+    result = []
+    for cmd in cmds:
+        array_len = str(len(cmd))
+        cmd_name = str(cmd[0]).upper()
+        cmd_name_len = len(cmd_name)
+        cmd_str = ['*%s' % array_len, '$%s' % cmd_name_len, cmd_name]
+        for arg in cmd[1:]:
+            arg_str = str(arg)
+            arg_len = len(arg_str)
+            cmd_str.extend(['$%s' % arg_len, arg_str])
+        cmd_str.append('')
+        cmd_byte = CRLF.join(cmd_str).encode()
+        result.append(cmd_byte)
+    return result
 
 
 class RESPParser:
     '''
-    parser will hold truncated response
+    parser will hold truncated response stream
     '''
 
     def __init__(self):
@@ -46,7 +61,7 @@ class RESPParser:
             deq_str = ''.join(self.last_str)
             data_str = deq_str + data_str
             self.last_str = deque([])
-        data_deq = deque(data_str.split('\r\n'))
+        data_deq = deque(data_str.split(CRLF))
         truncated_str = data_deq.pop()
         if truncated_str != '':
             self.last_str.append(truncated_str)
@@ -72,7 +87,7 @@ class RESPParser:
                             assert len(data) == count
                         except IndexError:
                             # last string
-                            self.last_str.extendleft(['\r\n', resp])
+                            self.last_str.extendleft([CRLF, resp])
                             break
                 elif resp.startswith('*'):
                     self.array_stack.append([int(resp[1]), []])
