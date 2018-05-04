@@ -2,7 +2,7 @@
 curds
 #####
 
-curio redis client
+Curio Redis Client
 
 learn from `redis-py <https://github.com/andymccurdy/redis-py>`_
 
@@ -39,9 +39,6 @@ Usage
     
     
     def main():
-        '''
-        for test
-        '''
         curio.run(test_client())
         return
 
