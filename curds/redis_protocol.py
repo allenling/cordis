@@ -84,6 +84,7 @@ class RESPParser:
                         count = int(resp[1:])
                         try:
                             data = data_deq.popleft()
+                            # TODO: handle assert exception?
                             assert len(data) == count
                         except IndexError:
                             # last string

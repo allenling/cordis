@@ -6,6 +6,7 @@ from curio.traps import _future_wait
 from curio import Queue
 
 from curds import utils
+from curds.redis_protocol import pack_redis, RESPParser
 
 
 CONNECTION_STATUS = {'initial': 0, 'pending': 1, 'connected': 2}
@@ -25,11 +26,14 @@ class AsyncConnection:
         self._buffer = []
         self._send_queue = Queue()
         self._future_deque = deque()
+        self.parser = RESPParser()
+        # last_multi = {'count': count, 'future': future, 'data': data}
+        self.last_multi = {}
         return
 
     async def connect(self):
         if self.status == CONNECTION_STATUS['pending']:
-            raise AsyncConnectionError('already in connecting status!')
+            raise AsyncConnectionError('already pending! please check out what happen in last connection')
         self.status = CONNECTION_STATUS['pending']
         connect_task = await curio.spawn(curio.open_connection, self.host, self.port)
         self.sock = await connect_task.join()
@@ -41,71 +45,79 @@ class AsyncConnection:
     async def close(self):
         return
 
-    async def send(self, data):
+    async def send_command(self, *cmd):
         future = Future()
-        await self._send_queue.put((data, future))
+        cmd_name = cmd[0]
+        cmd_byte = pack_redis([cmd])[0]
+        await self._send_queue.put((cmd_byte, cmd_name, future))
+        # wait for future notified
+        await _future_wait(future)
+        return future.result()
+
+    async def send_pipeline(self, *cmd):
+        future = Future()
+        cmd_byte_list = pack_redis([['multi'], *cmd, ['exec']])
+        cmd_bytes = b''.join(cmd_byte_list)
+        await self._send_queue.put((cmd_bytes, 'multi', future))
         # wait for future notified
         await _future_wait(future)
         return future.result()
 
     async def _wait_send(self):
         while True:
-            data_fus = await utils.wait_drain_curio_queue(self._send_queue)
-            for data, future in data_fus:
-                self._future_deque.append(future)
+            data_futures = await utils.wait_drain_curio_queue(self._send_queue)
+            for data, cmd_name, future in data_futures:
+                self._future_deque.append([cmd_name, future])
                 await self.sock.sendall(data)
         return
 
+    def handle_pipeline_resp(self, resps_iter):
+        assert self.last_multi
+        for resp in resps_iter:
+            if resp == 'QUEUED':
+                self.last_multi['count'] += 1
+                continue
+            self.last_multi['count'] -= 1
+            self.last_multi['data'].append(resp)
+            if self.last_multi['count'] == 0:
+                break
+        if self.last_multi['count'] == 0:
+            f = self.last_multi['future']
+            f.set_result()
+            self.last_multi = {}
+        return
+
     async def _wait_recv(self):
+        '''
+        handle pipeline response
+        '''
         while True:
-            resps = await self.sock.recv(2048)
-            f = self._future_deque.popleft()
-            f.set_result(resps)
-            continue
-            # TODO: unpack_response
+            resp_bytes = await self.sock.recv(SOCK_READ_SIZE)
+            resps = self.parser.parse(resp_bytes)
+            resps_iter = iter(resps)
+            if self.last_multi:
+                self.handle_pipeline_resp(resps_iter)
             for resp in resps:
-                f = self._future_deque.popleft()
-                # do not need await
-                # other side, __future_await__ is fine
-                f.set_result(resp)
+                cmd_name, f = self._future_deque.popleft()
+                if cmd_name == 'MULTI':
+                    # we meet a pipeline, starts with OK
+                    assert len(self.self.last_multi) == 0
+                    assert resp == 'OK'
+                    self.last_multi = {'count': 0, 'data': [], 'future': f}
+                    self.handle_pipeline_resp(resps_iter)
+                else:
+                    f.set_result(resp)
         return
 
 
 async def test_async_connection():
     ac = AsyncConnection()
     await ac.connect()
-    pipeline_cmd = [['MULTI'], ['SET', 'a', 1], ['INCR', 'a'], ['GET', 'a'], ['EXEC']]
-    pipeline_list = []
-    for i in pipeline_cmd:
-        res = utils.pack_command(*i)
-        pipeline_list.append(res[0])
-    print(pipeline_list)
-    pipeline_cmd_byte = b''.join(pipeline_list)
-    print(pipeline_cmd_byte)
-    res = await ac.send(pipeline_cmd_byte)
-    print(res)
-    print('-----------------')
-    cmds = [['SET', 'a', 1],
-            ['INCR', 'intkey'],
-            ['GET', 'a'], ['GET', 'b'], ['LRANGE', 'mlist', 0, -1],
-            ['HMGET', 'mhash', 'name', 'height'],
-            ['HGETALL', 'mobj'],
-            ['MULTI'],
-            ['LLEN', 'mlist'],
-            ['GET', 'a'],
-            ['EXEC'],
-            ['ZRANGE', 'mss', 0, -1, 'withscores'],
-            ['GEORADIUS', 'Sicily', 15, 37, 200, 'km', 'WITHCOORD']
-            ]
-    for cmd in cmds:
-        cmd_data = utils.pack_command(*cmd)
-        print(cmd_data)
-        res = await ac.send(cmd_data[0])
-        print(res)
-        print('---------------')
-    pipeline_cmd = b'*1\r\n$5\r\nMULTI\r\n*2\r\n$3\r\nGET\r\n$1\r\na\r\n*2\r\n$4\r\nLLEN\r\n$5\r\nmlist\r\n*1\r\n$4\r\nEXEC\r\n'
-    res = await ac.send(pipeline_cmd)
-    print(res)
+    await ac.sock.sendall(b'*1\r\n$5\r\nMULTI\r\n*2\r\n$3\r\nGET\r\n$1\r\na\r\n*2\r\n$4\r\nINCR\r\n$1\r\na\r\n*1\r\n$4\r\nEXEC\r\n')
+    res = await ac.sock.recv(1024)
+    parser = RESPParser()
+    data = parser.parse(res)
+    print(data)
     return
 
 
@@ -113,8 +125,6 @@ def main():
     '''
     for test
     '''
-    import redis
-    redis.StrictRedis
     curio.run(test_async_connection)
     return
 
