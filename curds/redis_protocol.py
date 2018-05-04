@@ -7,14 +7,35 @@ simple pack and parse
 
 from collections import deque
 
-from typing import List, Any
+from typing import List, Any, Dict
 
 CRLF = '\r\n'
 
 BYTE_CRLF = b'\r\n'
 
 
-def pack_redis(cmds: List[List[str]]):
+def resp_ok_to_bool(resp: str) -> bool:
+    '''
+    OK     -> True
+    others -> False
+    '''
+    return True if resp == 'OK' else False
+
+
+def resp_list_to_dict(resp: List) -> Dict[str, str]:
+    '''
+    [key1, value1, key2, value2, ...] -> {key1: value1, key2: value2, ...}
+    '''
+    len_resp = len(resp)
+    # even len
+    assert len_resp % 2 == 0
+    iter_resp = iter(resp)
+    clean_list = [(i, next(iter_resp)) for i in iter_resp]
+    clean_dict = dict(clean_list)
+    return clean_dict
+
+
+def pack_redis(cmds: List[List[str]]) -> List[bytes]:
     '''
     cmds = [[cmd1, arg1, ...], ...]
     '''

@@ -11,16 +11,15 @@ from curds.redis_protocol import pack_redis, RESPParser
 
 CONNECTION_STATUS = {'initial': 0, 'pending': 1, 'connected': 2}
 
-SOCK_READ_SIZE = 1024
-
 
 class AsyncConnectionError(Exception):
     pass
 
 
 class AsyncConnection:
+    SOCK_READ_SIZE = 1024
 
-    def __init__(self, host='127.0.0.1', port=6379):
+    def __init__(self, host='127.0.0.1', port=6379, read_size=1024):
         self.host, self.port = host, port
         self.status = CONNECTION_STATUS['initial']
         self._buffer = []
@@ -29,6 +28,7 @@ class AsyncConnection:
         self.parser = RESPParser()
         # last_multi = {'count': count, 'future': future, 'data': data}
         self.last_multi = {}
+        self.SOCK_READ_SIZE = read_size
         return
 
     async def connect(self):
@@ -56,9 +56,9 @@ class AsyncConnection:
 
     async def send_pipeline(self, *cmd):
         future = Future()
-        cmd_byte_list = pack_redis([['multi'], *cmd, ['exec']])
+        cmd_byte_list = pack_redis([['MULTI'], *cmd, ['EXEC']])
         cmd_bytes = b''.join(cmd_byte_list)
-        await self._send_queue.put((cmd_bytes, 'multi', future))
+        await self._send_queue.put((cmd_bytes, 'MULTI', future))
         # wait for future notified
         await _future_wait(future)
         return future.result()
@@ -73,17 +73,19 @@ class AsyncConnection:
 
     def handle_pipeline_resp(self, resps_iter):
         assert self.last_multi
+        op = False
         for resp in resps_iter:
+            op = True
             if resp == 'QUEUED':
                 self.last_multi['count'] += 1
                 continue
-            self.last_multi['count'] -= 1
-            self.last_multi['data'].append(resp)
-            if self.last_multi['count'] == 0:
-                break
-        if self.last_multi['count'] == 0:
+            assert self.last_multi['count'] == len(resp)
+            self.last_multi['count'] = 0
+            self.last_multi['data'] = resp
+            break
+        if op is True and self.last_multi['count'] == 0:
             f = self.last_multi['future']
-            f.set_result()
+            f.set_result(self.last_multi['data'])
             self.last_multi = {}
         return
 
@@ -92,16 +94,18 @@ class AsyncConnection:
         handle pipeline response
         '''
         while True:
-            resp_bytes = await self.sock.recv(SOCK_READ_SIZE)
+            resp_bytes = await self.sock.recv(self.SOCK_READ_SIZE)
             resps = self.parser.parse(resp_bytes)
+            if not resps:
+                continue
             resps_iter = iter(resps)
             if self.last_multi:
                 self.handle_pipeline_resp(resps_iter)
-            for resp in resps:
+            for resp in resps_iter:
                 cmd_name, f = self._future_deque.popleft()
                 if cmd_name == 'MULTI':
                     # we meet a pipeline, starts with OK
-                    assert len(self.self.last_multi) == 0
+                    assert len(self.last_multi) == 0
                     assert resp == 'OK'
                     self.last_multi = {'count': 0, 'data': [], 'future': f}
                     self.handle_pipeline_resp(resps_iter)
