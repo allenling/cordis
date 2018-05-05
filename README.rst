@@ -89,6 +89,20 @@ simple pack and parse layer, and you can use tools standalone.
     In [7]: parser.parse(response)
     Out[7]: [['a', '100', 'c', '101', 'b', '110']]
 
+and, combined with socket:
+
+.. code-block:: python
+
+    parser = redis_protocol.RESPParser()
+    
+    for data in sock.read(1024):
+    
+        resps = parser.parse(data)
+    
+        for resp in resps:
+    
+            do_something(resp)
+
 
 Connection/WATCH
 --------------------
