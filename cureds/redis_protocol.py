@@ -61,7 +61,7 @@ def pack_redis_command(cmds: List[List[str]]) -> List[bytes]:
     return result
 
 
-def pack_redis_pipeline(*cmds: List[str]) -> List[bytes]:
+def pack_redis_pipeline(*cmds: List[Any]) -> List[bytes]:
     new_cmds = [['MULTI'], *cmds, ['EXEC']]
     return pack_redis_command(new_cmds)
 

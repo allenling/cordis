@@ -1,4 +1,4 @@
-from curds.redis_protocol import pack_redis_command, pack_redis_pipeline
+from cureds.redis_protocol import pack_redis_command, pack_redis_pipeline
 
 
 class TestPackCmd:

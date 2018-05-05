@@ -1,6 +1,6 @@
-#####
-curds
-#####
+######
+cureds
+######
 
 Async(Curio) Redis Client
 
@@ -13,7 +13,7 @@ Usage
 
     async def test_client():
         # new client instance
-        client = CurdsClient()
+        client = CuredsClient()
 
         # wait connection
         await client.connect()
@@ -69,7 +69,7 @@ no recursion, just iteration in parser, easy to use.
 
 .. code-block:: python
 
-    In [1]: from curds import redis_protocol
+    In [1]: from cureds import redis_protocol
     
     In [2]: redis_protocol.pack_redis_command([['get', 'a']])
     Out[2]: [b'*2\r\n$3\r\nGET\r\n$1\r\na\r\n']

@@ -1,5 +1,5 @@
-from curds import redis_protocol
-from curds.tests.common_data import nested_array_resp, nested_array_result
+from cureds import redis_protocol
+from cureds.tests.common_data import nested_array_resp, nested_array_result
 
 
 class TestParseCommonType:
