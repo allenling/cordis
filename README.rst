@@ -2,7 +2,7 @@
 curds
 #####
 
-Curio Redis Client
+Async(Curio) Redis Client
 
 learning from `redis-py <https://github.com/andymccurdy/redis-py>`_
 
@@ -62,6 +62,33 @@ NOTES
 
 pack/parse
 -------------
+
+simple pack and parse layer, and you can use tools standalone.
+
+.. code-block:: python
+
+    In [1]: from curds import redis_protocol
+    
+    In [2]: redis_protocol.pack_redis_command([['get', 'a']])
+    Out[2]: [b'*2\r\n$3\r\nGET\r\n$1\r\na\r\n']
+    
+    In [3]: redis_protocol.pack_redis_command([['incr', 'a']])
+    Out[3]: [b'*2\r\n$4\r\nINCR\r\n$1\r\na\r\n']
+    
+    In [4]: redis_protocol.pack_redis_pipeline(['GET', 'a'], ['INCR', 'a'])
+    Out[4]: 
+    [b'*1\r\n$5\r\nMULTI\r\n',
+     b'*2\r\n$3\r\nGET\r\n$1\r\na\r\n',
+     b'*2\r\n$4\r\nINCR\r\n$1\r\na\r\n',
+     b'*1\r\n$4\r\nEXEC\r\n']
+    
+    In [5]: response = b'*6\r\n$1\r\na\r\n$3\r\n100\r\n$1\r\nc\r\n$3\r\n101\r\n$1\r\nb\r\n$3\r\n110\r\n'
+    
+    In [6]: parser = redis_protocol.RESPParser()
+    
+    In [7]: parser.parse(response)
+    Out[7]: [['a', '100', 'c', '101', 'b', '110']]
+
 
 Connection/WATCH
 --------------------

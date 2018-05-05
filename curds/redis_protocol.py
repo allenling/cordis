@@ -41,7 +41,7 @@ RESP_CALLBACK = {'SET': ok_to_bool,
                  }
 
 
-def pack_redis(cmds: List[List[str]]) -> List[bytes]:
+def pack_redis_command(cmds: List[List[str]]) -> List[bytes]:
     '''
     cmds = [[cmd1, arg1, ...], ...]
     '''
@@ -59,6 +59,11 @@ def pack_redis(cmds: List[List[str]]) -> List[bytes]:
         cmd_byte = CRLF.join(cmd_str).encode()
         result.append(cmd_byte)
     return result
+
+
+def pack_redis_pipeline(*cmds: List[str]) -> List[bytes]:
+    new_cmds = [['MULTI'], *cmds, ['EXEC']]
+    return pack_redis_command(new_cmds)
 
 
 class RESPParser:

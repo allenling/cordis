@@ -6,7 +6,7 @@ from curio.traps import _future_wait
 from curio import Queue
 
 from curds import utils
-from curds.redis_protocol import pack_redis, RESPParser, RESP_CALLBACK
+from curds.redis_protocol import pack_redis_command, pack_redis_pipeline, RESPParser, RESP_CALLBACK
 
 
 CONNECTION_STATUS = {'initial': 0, 'pending': 1, 'connected': 2}
@@ -48,7 +48,7 @@ class AsyncConnection:
     async def send_command(self, *cmd):
         future = Future()
         cmd_name = cmd[0]
-        cmd_byte = pack_redis([cmd])[0]
+        cmd_byte = pack_redis_command([cmd])[0]
         await self._send_queue.put((cmd_byte, cmd_name, future))
         # wait for future notified
         await _future_wait(future)
@@ -57,7 +57,7 @@ class AsyncConnection:
     async def send_pipeline(self, *cmd):
         future = Future()
         cmd_names = ','.join(['MULTI'] + [i[0] for i in cmd])
-        cmd_byte_list = pack_redis([['MULTI'], *cmd, ['EXEC']])
+        cmd_byte_list = pack_redis_pipeline(*cmd)
         cmd_bytes = b''.join(cmd_byte_list)
         await self._send_queue.put((cmd_bytes, cmd_names, future))
         # wait for future notified
