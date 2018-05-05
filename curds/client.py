@@ -1,11 +1,6 @@
 import curio
 
 from curds.connection import AsyncConnection
-from curds.redis_protocol import resp_ok_to_bool, resp_list_to_dict
-
-RESP_CALLBACK = {'SET': resp_ok_to_bool,
-                 'HGETALL': resp_list_to_dict,
-                 }
 
 
 class RedisAuthError(Exception):
@@ -13,6 +8,10 @@ class RedisAuthError(Exception):
 
 
 class SelectDBError(Exception):
+    pass
+
+
+class NotSupportOperation(Exception):
     pass
 
 
@@ -32,21 +31,12 @@ class CurdsClient:
         # send auth command
         if self.password is not None:
             resp = await self.auth(self.password)
-            if resp != 'OK':
+            if resp is not True:
                 raise RedisAuthError(resp)
-        # send select command
-        if self.db > 0:
-            resp = await self.select(self.db)
-            if resp != 'OK':
-                raise SelectDBError(resp)
         return
 
     async def execute_command(self, *cmd):
-        cmd_name = cmd[0]
         resp = await self.connection.send_command(*cmd)
-        callback = RESP_CALLBACK.get(cmd_name, None)
-        if callback is not None:
-            resp = callback(resp)
         return resp
 
     async def auth(self, password):
@@ -58,10 +48,9 @@ class CurdsClient:
 
     async def select(self, db_name):
         '''
-        select db
+        select db, do not support, see redis-py doc
         '''
-        resp = await self.execute_command('SELECT', db_name)
-        return resp
+        raise NotSupportOperation('select, see redis-py doc')
 
     async def get(self, key):
         resp = await self.execute_command('GET', key)
@@ -93,7 +82,7 @@ class CurdsClient:
 
 class CurdsPipeline(CurdsClient):
     '''
-    duplicate define redis operation, what should we do?
+    we define redis operation interfaces again, what should we do?
     '''
 
     def __init__(self, connection):
@@ -129,22 +118,21 @@ class CurdsPipeline(CurdsClient):
         resp = self.execute_command('HGETALL', key)
         return resp
 
+    def watch(self, *keys):
+        '''
+        how to deal with watch?
+        '''
+        raise NotImplementedError
+
     async def execute(self):
         resps = await self.connection.send_pipeline(*self.cmds)
-        clean_resp = []
-        for cmd, resp in zip(self.cmds, resps):
-            callback = RESP_CALLBACK.get(cmd[0], None)
-            if callback is None:
-                clean_resp.append(resp)
-            else:
-                clean_resp.append(callback(resp))
-        return clean_resp
+        return resps
 
     def __enter__(self):
         return self
 
     def __exit__(self, *args, **kwargs):
-        del self.connection
+        self.connection = None
         self.cmds = []
         return
 

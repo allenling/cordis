@@ -4,7 +4,7 @@ curds
 
 Curio Redis Client
 
-learn from `redis-py <https://github.com/andymccurdy/redis-py>`_
+learning from `redis-py <https://github.com/andymccurdy/redis-py>`_
 
 Usage
 =========
@@ -12,8 +12,13 @@ Usage
 .. code-block:: python
 
     async def test_client():
+        # new client instance
         client = CurdsClient()
+
+        # wait connection
         await client.connect()
+
+        # send commands
         data = await client.set('a', 1)
         print(data)
         for _ in range(10):
@@ -27,6 +32,8 @@ Usage
         print(data)
         data = await client.hgetall('client_hash')
         print(data)
+
+        # use pipeline
         with client.pipeline() as p:
             p.set('a', 1)
             p.get('a')
@@ -42,10 +49,49 @@ Usage
         curio.run(test_client())
         return
 
+How it works
+================
+
+
+NOTES
+==========
+
+1. SELECT: Not implemented, see redis-py`s doc
+
+2. DEL: 'del' replace by delete, see redis-py`s doc
+
+pack/parse
+-------------
+
+Connection/WATCH
+--------------------
+
+What if there are many tasks sending *watch* ?
+
+Thinking about many threads sending *watch* first.
+
+process p1 create two threads, thread1 and thread2. and another process p2 create one thread, thread3.
+
+1. thread1, watch a
+
+2. thread3(p2), incr a
+
+3. thread2, multi, incr b, exec, fail!!!!
+
+4. thread1, multi, ..., exec, success!!!
+
+In redis-py, there is a connection pool, and if there is no any avaliable connection, it will create a new connection.
+
+So, redis-py will create a new connection for thread2, because thread1 do not release old connection yet
+
+So, *watch a* in thread1 would have no effect on *multi* in thread2 when thread3 modify watched key(sending *incr a*)
+
+But, should we create new connection for every task?
+
+Consider that we would have hundreds, maybe thousands, tasks in our async app, creating new connection for every task is a good idea?
+
+
 TODO
 ======
 
-1. more redis command implementation
-
-2. more test
 

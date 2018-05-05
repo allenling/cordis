@@ -14,7 +14,7 @@ CRLF = '\r\n'
 BYTE_CRLF = b'\r\n'
 
 
-def resp_ok_to_bool(resp: str) -> bool:
+def ok_to_bool(resp: str) -> bool:
     '''
     OK     -> True
     others -> False
@@ -22,7 +22,7 @@ def resp_ok_to_bool(resp: str) -> bool:
     return True if resp == 'OK' else False
 
 
-def resp_list_to_dict(resp: List) -> Dict[str, str]:
+def list_to_dict(resp: List) -> Dict[str, str]:
     '''
     [key1, value1, key2, value2, ...] -> {key1: value1, key2: value2, ...}
     '''
@@ -33,6 +33,12 @@ def resp_list_to_dict(resp: List) -> Dict[str, str]:
     clean_list = [(i, next(iter_resp)) for i in iter_resp]
     clean_dict = dict(clean_list)
     return clean_dict
+
+
+RESP_CALLBACK = {'SET': ok_to_bool,
+                 'HGETALL': list_to_dict,
+                 'AUTH': ok_to_bool,
+                 }
 
 
 def pack_redis(cmds: List[List[str]]) -> List[bytes]:
@@ -112,7 +118,10 @@ class RESPParser:
                             self.last_str.extendleft([CRLF, resp])
                             break
                 elif resp.startswith('*'):
-                    self.array_stack.append([int(resp[1]), []])
+                    if resp[1:] == '-1':
+                        res.append([])
+                    else:
+                        self.array_stack.append([int(resp[1]), []])
                     continue
                 # handle nested array
                 if self.array_stack:
