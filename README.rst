@@ -63,7 +63,9 @@ NOTES
 pack/parse
 -------------
 
-simple pack and parse layer, and you can use tools standalone.
+simple pack and parse layer, and you can use pack/parse module standalone.
+
+no recursion, just iteration in parser, easy to use.
 
 .. code-block:: python
 
