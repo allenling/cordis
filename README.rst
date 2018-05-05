@@ -63,6 +63,8 @@ NOTES
 pack/parse
 -------------
 
+Redis Protocol Implementation
+
 simple pack and parse layer, and you can use pack/parse module standalone.
 
 no recursion, just iteration in parser, easy to use.
