@@ -1,6 +1,6 @@
 import curio
 
-from cureds.connection import AsyncConnection
+from curedis.connection import AsyncConnection
 
 
 class RedisAuthError(Exception):
@@ -15,7 +15,7 @@ class NotSupportOperation(Exception):
     pass
 
 
-class CuredsClient:
+class CuredisClient:
 
     def __init__(self, host='127.0.0.1', port=6379, db=0, password=None, read_size=1024):
         self.host, self.port = host, port
@@ -138,7 +138,7 @@ class CurdsPipeline:
 
 
 async def test_client():
-    cclient = CuredsClient(read_size=10)
+    cclient = CuredisClient(read_size=10)
     await cclient.connect()
     data = await cclient.set('a', 1)
     print(data)

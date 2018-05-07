@@ -5,8 +5,8 @@ import curio
 from curio.traps import _future_wait
 from curio import Queue
 
-from cureds import utils
-from cureds.redis_protocol import pack_redis_command, pack_redis_pipeline, RESPParser, RESP_CALLBACK
+from curedis import utils
+from curedis.redis_protocol import pack_redis_command, pack_redis_pipeline, RESPParser, RESP_CALLBACK
 
 
 CONNECTION_STATUS = {'initial': 0, 'pending': 1, 'connected': 2}
